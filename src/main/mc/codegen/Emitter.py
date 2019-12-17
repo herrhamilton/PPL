@@ -37,11 +37,15 @@ class Emitter():
             return "java/lang/String"
         elif typeIn is VoidType:
             return "void"
+        elif typeIn is FloatType:
+            return "float"
+        elif typeIn is BoolType:
+            return "boolean"
 
     def emitPUSHICONST(self, in_, frame):
         #in: Int or String
         #frame: Frame
-        
+
         frame.push();
         if type(in_) is int:
             i = in_
@@ -51,6 +55,9 @@ class Emitter():
                 return self.jvm.emitBIPUSH(i)
             elif i >= -32768 and i <= 32767:
                 return self.jvm.emitSIPUSH(i)
+            else:
+                return self.jvm.emitLDC(str(i))
+
         elif type(in_) is str:
             if in_ == "true":
                 return self.emitPUSHICONST(1, frame)
@@ -62,16 +69,16 @@ class Emitter():
     def emitPUSHFCONST(self, in_, frame):
         #in_: String
         #frame: Frame
-        
+
         f = float(in_)
         frame.push()
         rst = "{0:.4f}".format(f)
         if rst == "0.0" or rst == "1.0" or rst == "2.0":
             return self.jvm.emitFCONST(rst)
         else:
-            return self.jvm.emitLDC(in_)           
+            return self.jvm.emitLDC(in_)
 
-    ''' 
+    '''
     *    generate code to push a constant onto the operand stack.
     *    @param in the lexeme of the constant
     *    @param typ the type of the constant
@@ -80,7 +87,7 @@ class Emitter():
         #in_: String
         #typ: Type
         #frame: Frame
-        
+
         if type(typ) is IntType:
             return self.emitPUSHICONST(in_, frame)
         elif type(typ) is FloatType:
@@ -99,7 +106,7 @@ class Emitter():
         #in_: Type
         #frame: Frame
         #..., arrayref, index, value -> ...
-        
+
         frame.pop()
         if type(in_) is IntType:
             return self.jvm.emitIALOAD()
@@ -112,13 +119,13 @@ class Emitter():
         #in_: Type
         #frame: Frame
         #..., arrayref, index, value -> ...
-        
+
         frame.pop()
         frame.pop()
         frame.pop()
         if type(in_) is IntType:
             return self.jvm.emitIASTORE()
-        elif type(in_) is ArrayPointerType or type(in_) is ClassType or type(in_) is StringType:
+        elif type(in_) is ArrayPointerType or type(in_) is cgen.ClassType or type(in_) is StringType:
             return self.jvm.emitAASTORE()
         else:
             raise IllegalOperandException(str(in_))
@@ -137,7 +144,7 @@ class Emitter():
         #fromLabel: Int
         #toLabel: Int
         #frame: Frame
-        
+
         return self.jvm.emitVAR(in_, varName, self.getJVMType(inType), fromLabel, toLabel)
 
     def emitREADVAR(self, name, inType, index, frame):
@@ -146,9 +153,9 @@ class Emitter():
         #index: Int
         #frame: Frame
         #... -> ..., value
-        
+
         frame.push()
-        if type(inType) is IntType:
+        if type(inType) is IntType or type(inType) is BoolType:
             return self.jvm.emitILOAD(index)
         elif type(inType) is FloatType:
             return self.jvm.emitFLOAD(index)
@@ -179,10 +186,10 @@ class Emitter():
         #index: Int
         #frame: Frame
         #..., value -> ...
-        
+
         frame.pop()
 
-        if type(inType) is IntType:
+        if type(inType) is IntType or type(inType) is BoolType:
             return self.jvm.emitISTORE(index)
         elif type(inType) is FloatType:
             return self.jvm.emitFSTORE(index)
@@ -214,7 +221,7 @@ class Emitter():
         #isFinal: Boolean
         #value: String
 
-        return self.jvm.emitSTATICFIELD(lexeme, self.getJVMType(in_), False)
+        return self.jvm.emitSTATICFIELD(lexeme, self.getJVMType(in_), isFinal)
 
     def emitGETSTATIC(self, lexeme, in_, frame):
         #lexeme: String
@@ -228,7 +235,7 @@ class Emitter():
         #lexeme: String
         #in_: Type
         #frame: Frame
-        
+
         frame.pop()
         return self.jvm.emitPUTSTATIC(lexeme, self.getJVMType(in_))
 
@@ -314,7 +321,7 @@ class Emitter():
             return self.jvm.emitFNEG()
 
     def emitNOT(self, in_, frame):
-#in_: Type
+        #in_: Type
         #frame: Frame
 
         label1 = frame.getNewLabel()
@@ -420,7 +427,7 @@ class Emitter():
 
         frame.pop()
         frame.pop()
-        if type(in_) is IntType: # TODO: Add BoolType
+        if type(in_) is IntType or type(in_) is BoolType:
             if op == ">":
                 result.append(self.jvm.emitIFICMPLE(labelF))
             elif op == ">=":
@@ -434,18 +441,15 @@ class Emitter():
             elif op == "==":
                 result.append(self.jvm.emitIFICMPNE(labelF))
         if type(in_) is FloatType:
+            result.append(self.jvm.emitFCMPL())
             if op == ">":
-                result.append(self.jvm.emitFCMPL())
                 result.append(self.jvm.emitIFLE(labelF))
             elif op == ">=":
-                result.append(self.jvm.emitFCMPL())
                 result.append(self.jvm.emitIFLT(labelF))
             elif op == "<":
-                result.append(self.jvm.emitFCMPL())
                 result.append(self.jvm.emitIFGE(labelF))
 
             elif op == "<=":
-                result.append(self.jvm.emitFCMPL())
                 result.append(self.jvm.emitIFGT(labelF))
 
         result.append(self.emitPUSHCONST("1", IntType(), frame))
@@ -520,7 +524,7 @@ class Emitter():
     '''
 
     '''   generate code to initialize local array variables.
-    *   @param in the list of symbol entries corresponding to local array variable.    
+    *   @param in the list of symbol entries corresponding to local array variable.
     '''
 
     '''   generate code to jump to label if the value on top of operand stack is true.<p>
@@ -558,7 +562,7 @@ class Emitter():
         #frame: Frame
 
         frame.pop()
-        return self.jvm.emitIFICMPLT(label)    
+        return self.jvm.emitIFICMPLT(label)
 
     '''   generate code to duplicate the value on the top of the operand stack.<p>
     *   Stack:<p>
@@ -600,13 +604,19 @@ class Emitter():
         if type(in_) is IntType:
             frame.pop()
             return self.jvm.emitIRETURN()
-        elif type(in_) is FloatType: # TODO: Change to just in_ as well??
+        if type(in_) is FloatType:
             frame.pop()
             return self.jvm.emitFRETURN()
+        if type(in_) is StringType:
+            frame.pop()
+            return self.jvm.emitARETURN()
+        if type(in_) is BoolType:
+            frame.pop()
+            return self.jvm.emitIRETURN()
         elif type(in_) is VoidType:
             return self.jvm.emitRETURN()
 
-    ''' generate code that represents a label	
+    ''' generate code that represents a label
     *   @param label the label
     *   @return code Label<label>:
     '''
@@ -616,7 +626,7 @@ class Emitter():
 
         return self.jvm.emitLABEL(label)
 
-    ''' generate code to jump to a label	
+    ''' generate code to jump to a label
     *   @param label the label
     *   @return code goto Label<label>
     '''
@@ -653,7 +663,6 @@ class Emitter():
 
     def emitEPILOG(self):
         file = open(self.filename, "w")
-        
         file.write(''.join(self.buff))
         file.close()
 
@@ -667,9 +676,3 @@ class Emitter():
 
     def clearBuff(self):
         self.buff.clear()
-
-
-
-
-
-        
