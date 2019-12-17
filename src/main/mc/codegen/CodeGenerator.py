@@ -237,33 +237,18 @@ class CodeGenVisitor(BaseVisitor, Utils):
     def visitBinaryOp(self, ast, o):
         ctxt = o
         frame = ctxt.frame
-        operandStr = ""
+
+        if ast.op == "=":
+            return self.visitAssignment(ast, o)
+        
         if ast.op in ["+", "-", "*", "/"]:
             operandStr, type_ = self.getOperands(ast.left, ast.right, o)
             if ast.op == "+" or ast.op == "-":
-                s = operandStr + self.emit.emitADDOP(ast.op, type_ ,frame)
-                return s, type_
+                operandStr += self.emit.emitADDOP(ast.op, type_ ,frame)
             else:
-                return operandStr + self.emit.emitMULOP(ast.op, type_ ,frame), type_
-        if ast.op == "=":
-            #this visit just for type checking
-            _, leftType = self.visit(ast.left, Access(frame, o.sym, True, True))
-            rightStr, rightType = self.visit(ast.right, Access(frame, o.sym, False, False))
+                operandStr += self.emit.emitMULOP(ast.op, type_ ,frame)
 
-            #TODO: add type conversion
-            # duplicate result of assignment so it stays after storing
-            # get store cell
-            leftStr, leftType = self.visit(ast.left, Access(frame, o.sym, True, False))
-            operandStr = rightStr + self.emit.emitDUP(frame) + leftStr # TODO: why dup?
-
-            self.emit.printout(operandStr)
-        # a = b (1 = 2)
-        # iload_2
-        # dup
-        # istore_1
-        # always leave value on stack after assignment/expression
-            return operandStr, leftType
-
+            return operandStr, type_
         if ast.op in [">", "<", ">=", "<=", "==", "!="]: #TODO: types
             print("AAAAAAAAAAAAAAAAAAAAAAAA")
 
@@ -277,8 +262,41 @@ class CodeGenVisitor(BaseVisitor, Utils):
             self.emit.printout(self.emit.emitREOP(ast.op, leftType, frame))
             return operandStr, leftType
 
-    def visitId(self, ast, o):
+    def visitAssignment(self, ast, o):
+        # a = b (index1 = index2)
+        # iload_2
+        # dup # always leave value on stack after assignment/expression
+        # istore_1
 
+        ctxt = o
+        frame = ctxt.frame
+
+        #this visit just for type checking
+        _, l_ = self.visit(ast.left, Access(frame, o.sym, True, True))
+
+        rightStr, r_ = self.visit(ast.right, Access(frame, o.sym, False, False))
+        operandStr = rightStr
+        
+        leftType = type(l_)
+        rightType = type(r_)
+
+        if leftType is not rightType:
+            if leftType is IntType and rightType is FloatType:
+                raise Exception("Cannot assign float to int.. But didn't we do that in StaticCheck?!")
+            elif leftType is FloatType and rightType is IntType:
+                operandStr += self.emit.emitI2F(frame)
+            # else:
+            #     raise NotImplementedError("Supporting only Int and Float atm") # cannot use this because it breaks genMETHOD. lol.
+
+            # duplicate result of assignment so it stays after storing
+            # get store cell
+        leftStr, leftType = self.visit(ast.left, Access(frame, o.sym, True, False))
+        operandStr += self.emit.emitDUP(frame) + leftStr
+
+        self.emit.printout(operandStr)
+        return operandStr, leftType
+
+    def visitId(self, ast, o):
         frame = o.frame
         symbols = o.sym
         isFirst = o.isFirst
@@ -288,7 +306,7 @@ class CodeGenVisitor(BaseVisitor, Utils):
         if type(id_.value) is CName:
             name = self.className + "/" + id_.name
             if isLeft:
-                if isFirst: #just for type checking
+                if isFirst: #just for type checking, NO emit here
                     x = "", id_.mtype
                     return x # find id in symbols
                 else:

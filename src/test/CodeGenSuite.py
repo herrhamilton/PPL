@@ -52,12 +52,26 @@ class CheckCodeGenSuite(unittest.TestCase):
     	expect = "3.4"
     	self.assertTrue(TestCodeGen.test(input,expect,506))
 
-    def test_vardecl_ast(self):
+    def test_int_vardecl_ast(self):
     	input = Program([VarDecl("x", IntType()),
     		FuncDecl(Id("main"),[],VoidType(),Block([BinaryOp("=",Id("x"),IntLiteral(1)),
     			CallExpr(Id("putInt"),[Id("x")])]))])
     	expect = "1"
     	self.assertTrue(TestCodeGen.test(input,expect,507))
+
+    def test_float_vardecl_ast(self):
+        input = Program([VarDecl("x", FloatType()),
+		    		FuncDecl(Id("main"),[],VoidType(),Block([BinaryOp("=",Id("x"),FloatLiteral(1.0)),
+    			CallExpr(Id("putFloat"),[Id("x")])]))])
+        expect = "1.0"
+        self.assertTrue(TestCodeGen.test(input,expect,508))
+
+    def test_int2float_vardecl_ast(self):
+        input = Program([VarDecl("x", FloatType()),
+            FuncDecl(Id("main"),[],VoidType(),Block([BinaryOp("=",Id("x"),IntLiteral(1)),
+                CallExpr(Id("putFloat"),[Id("x")])]))])
+        expect = "1.0"
+        self.assertTrue(TestCodeGen.test(input,expect,509))
 
     # def test_for_ast(self):
     #     exp1 = BinaryOp("=",Id("i"),IntLiteral(1))
