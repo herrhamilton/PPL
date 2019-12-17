@@ -39,7 +39,7 @@ class Emitter():
             return "void"
 
     def emitPUSHICONST(self, in_, frame):
-        #in: Int or Sring
+        #in: Int or String
         #frame: Frame
         
         frame.push();
@@ -167,7 +167,7 @@ class Emitter():
     *   generate code to pop a value on top of the operand stack and store it to a block-scoped variable.
     *   @param name the symbol entry of the variable.
     '''
-    def emitWRITEVAR(self, name, inType, index, frame):
+    def emit(self, name, inType, index, frame):
         #name: String
         #inType: Type
         #index: Int
@@ -186,7 +186,7 @@ class Emitter():
     ''' generate the second instruction for array cell access
     *
     '''
-    def emitWRITEVAR2(self, name, typ, frame):
+    def emit2(self, name, typ, frame):
         #name: String
         #typ: Type
         #frame: Frame
@@ -206,7 +206,7 @@ class Emitter():
         #isFinal: Boolean
         #value: String
 
-        return self.jvm.emitSTATICFIELD(lexeme, self.getJVMType(in_), false)
+        return self.jvm.emitSTATICFIELD(lexeme, self.getJVMType(in_), False)
 
     def emitGETSTATIC(self, lexeme, in_, frame):
         #lexeme: String
@@ -333,12 +333,12 @@ class Emitter():
 
         frame.pop()
         if lexeme == "+":
-            if type(in_) is IntType:
+            if in_ is IntType:
                 return self.jvm.emitIADD()
             else:
                 return self.jvm.emitFADD()
         else:
-            if type(in_) is IntType:
+            if in_ is IntType:
                 return self.jvm.emitISUB()
             else:
                 return self.jvm.emitFSUB()
@@ -361,11 +361,13 @@ class Emitter():
                 return self.jvm.emitIMUL()
             else:
                 return self.jvm.emitFMUL()
-        else:
+        elif lexeme == "/":
             if type(in_) is IntType:
                 return self.jvm.emitIDIV()
             else:
                 return self.jvm.emitFDIV()
+        else:
+            raise Exception("Not supposed to enter emitMULOP with lemexe: " + lexeme)
 
     def emitDIV(self, frame):
         #frame: Frame
@@ -595,7 +597,7 @@ class Emitter():
         #label: Int
         #frame: Frame
 
-        return self.jvm.emitGOTO(label)
+        return self.jvm.emitGOTO(str(label))
 
     ''' generate some starting directives for a class.<p>
     *   .source MPC.CLASSNAME.java<p>
@@ -624,6 +626,7 @@ class Emitter():
 
     def emitEPILOG(self):
         file = open(self.filename, "w")
+        
         file.write(''.join(self.buff))
         file.close()
 

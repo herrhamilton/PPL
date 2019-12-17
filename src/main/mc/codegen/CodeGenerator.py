@@ -20,6 +20,7 @@ class CodeGenerator(Utils):
         return [Symbol("getInt", MType(list(), IntType()), CName(self.libName)),
                     Symbol("putInt", MType([IntType()], VoidType()), CName(self.libName)),
                     Symbol("putIntLn", MType([IntType()], VoidType()), CName(self.libName)),
+                    Symbol("putFloat", MType([FloatType()], VoidType()), CName(self.libName)),
                     Symbol("putFloatLn", MType([FloatType()], VoidType()), CName(self.libName))
                     ]
 
@@ -150,6 +151,18 @@ class CodeGenVisitor(BaseVisitor, Utils):
         self.genMETHOD(ast, subctxt.sym, frame)
         return SubBody(None, [Symbol(ast.name, MType(list(), ast.returnType), CName(self.className))] + subctxt.sym)
 
+    def visitVarDecl(self, ast, o):
+        ctxt = o
+        frame = ctxt.frame
+        if frame is None: #global
+            self.emit.printout(self.emit.emitATTRIBUTE(ast.variable, ast.varType, False, None))
+            o.sym.append(Symbol(ast.variable, ast.varType, CName(self.className)))
+            return o
+
+        else: #local var
+            raise Exception("ÄH HALLOOOOOOOO")
+            pass
+
     def visitCallExpr(self, ast, o):
         #ast: CallExpr
         #o: Any
@@ -169,12 +182,137 @@ class CodeGenVisitor(BaseVisitor, Utils):
         self.emit.printout(in_[0])
         self.emit.printout(self.emit.emitINVOKESTATIC(cname + "/" + ast.method.name, ctype, frame))
 
+    def visitFor(self, ast, o):
+    # expr1:Expr
+    # expr2:Expr
+    # expr3:Expr
+    # loop:Stmt
+        ctxt = o
+        frame = ctxt.frame
+
+        frame.enterLoop()
+        exp1, exp1typ = self.visit(ast.expr1,Access(frame, ctxt.sym, False, False))
+        #self.emit.printout(exp1)
+
+        self.emit.printout(self.emit.emitLABEL(frame.getContinueLabel(), frame))
+        exp2, exp2typ = self.visit(ast.expr2,Access(frame, ctxt.sym, False, False))
+        self.emit.printout(self.emit.emitIFTRUE(frame.getBreakLabel(), frame))
+
+        # loop
+        self.visit(ast.loop, ctxt) #TODO: ctxt Correct?
+        # Jim: list(map(lambda x: self.visit(x, SubBody(frame, ctxt.sym)), ast.loop))
+        #exp3
+        exp3, exp3typ = self.visit(ast.expr3,Access(frame, ctxt.sym, False, False)) # TODO: False False good or change Access in general?
+        
+
+        self.emit.printout(self.emit.emitGOTO(frame.getContinueLabel(),frame))
+        self.emit.printout(self.emit.emitLABEL(frame.getBreakLabel(), frame))
+
+        frame.exitLoop()
+    # evaluate expr1
+    # label1
+    # evaluate expr2
+    # if false, jump to label 2
+    # evaluate loop
+    # evaluate expr 3
+    # goto label1
+    # label 2
+
     def visitIntLiteral(self, ast, o):
         #ast: IntLiteral
         #o: Any
-
+        
         ctxt = o
         frame = ctxt.frame
         return self.emit.emitPUSHICONST(ast.value, frame), IntType()
 
-    
+    def visitFloatLiteral(self, ast, o):
+        #ast: FloatLiteral
+        #o: Any
+        
+        ctxt = o
+        frame = ctxt.frame
+        return self.emit.emitPUSHFCONST(str(ast.value), frame), FloatType()
+
+    def visitBinaryOp(self, ast, o):
+        ctxt = o
+        frame = ctxt.frame
+        operandStr = ""
+        if ast.op in ["+", "-", "*", "/"]:
+            operandStr, type_ = self.getOperands(ast.left, ast.right, o)
+            if ast.op == "+" or ast.op == "-":
+                s = operandStr + self.emit.emitADDOP(ast.op, type_ ,frame)
+                return s, type_
+            else:
+                return operandStr + self.emit.emitMULOP(ast.op, type_ ,frame), type_
+        if ast.op == "=":
+            #this visit just for type checking
+            _, leftType = self.visit(ast.left, Access(frame, o.sym, True, True))
+            rightStr, rightType = self.visit(ast.right, Access(frame, o.sym, False, False))
+
+            #TODO: add type conversion
+            # duplicate result of assignment so it stays after storing
+            # get store cell
+            leftStr, leftType = self.visit(ast.left, Access(frame, o.sym, True, False))
+            operandStr = rightStr + self.emit.emitDUP(frame) + leftStr # TODO: why dup?
+
+            self.emit.printout(operandStr)
+        # a = b (1 = 2)
+        # iload_2
+        # dup
+        # istore_1
+        # always leave value on stack after assignment/expression
+            return operandStr, leftType
+
+        if ast.op in [">", "<", ">=", "<=", "==", "!="]: #TODO: types
+            print("AAAAAAAAAAAAAAAAAAAAAAAA")
+
+            print(frame.currOpStackSize)
+            leftStr, leftType = self.visit(ast.left, Access(frame, o.sym, False, False))
+            print(frame.currOpStackSize)
+            rightStr, rightType = self.visit(ast.right, Access(frame, o.sym, False, False))
+            print(frame.currOpStackSize)
+
+            self.emit.printout(leftStr + rightStr)
+            self.emit.printout(self.emit.emitREOP(ast.op, leftType, frame))
+            return operandStr, leftType
+
+    def visitId(self, ast, o):
+
+        frame = o.frame
+        symbols = o.sym
+        isFirst = o.isFirst
+        isLeft = o.isLeft
+        id_ = self.lookup(ast.name, symbols, lambda x: x.name)
+
+        if type(id_.value) is CName:
+            name = self.className + "/" + id_.name
+            if isLeft:
+                if isFirst: #just for type checking
+                    x = "", id_.mtype
+                    return x # find id in symbols
+                else:
+                    return self.emit.emitPUTSTATIC(name, id_.mtype, frame), id_.mtype # find id, store
+            else:
+                return self.emit.emitGETSTATIC(name,id_.mtype,frame), id_.mtype #find id in symbols, load index
+        else: #local
+            raise Exception("Should not enter this yet..")
+
+    def getOperands(self, lOp, rOp, o):
+        frame = o.frame
+        lStr, l_ = self.visit(lOp, Access(frame, o, False, False))
+        rStr, r_ = self.visit(rOp, Access(frame, o, False, False))
+        
+        lType = type(l_)
+        rType = type(r_)
+
+        if lType is rType:
+            return lStr + rStr, lType
+        elif lType is FloatType and rType is IntType:
+            return lStr + rStr + self.emit.emitI2F(frame), FloatType #TODO: delete () again (move to Emitter)
+        elif lType is IntType and rType is FloatType:
+            return lStr + self.emit.emitI2F(frame) + rStr, FloatType
+        else:
+            raise Exception("Should never come here")
+
+        
