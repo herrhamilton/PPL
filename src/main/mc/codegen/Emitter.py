@@ -580,6 +580,9 @@ class Emitter():
         if type(in_) is IntType:
             frame.pop()
             return self.jvm.emitIRETURN()
+        elif type(in_) is FloatType: # TODO: Change to just in_ as well??
+            frame.pop()
+            return self.jvm.emitFRETURN()
         elif type(in_) is VoidType:
             return self.jvm.emitRETURN()
 

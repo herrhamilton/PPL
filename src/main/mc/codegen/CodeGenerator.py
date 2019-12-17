@@ -136,7 +136,7 @@ class CodeGenVisitor(BaseVisitor, Utils):
             self.emit.printout(self.emit.emitINVOKESPECIAL(frame))
 
         #list(map(lambda x: self.visit(x, SubBody(frame, glenv)), body.member))
-        for x in body.member:
+        for x in body.member: # TODO: change to visitBody
             if type(x) is VarDecl:
                 glenv = self.visit(x, SubBody(frame, glenv.sym))
             else:
@@ -148,14 +148,29 @@ class CodeGenVisitor(BaseVisitor, Utils):
         self.emit.printout(self.emit.emitENDMETHOD(frame))
         frame.exitScope();
 
+    def visitReturn(self, ast, o):
+        ctxt = o
+        frame = ctxt.frame
+        retType = frame.returnType
+
+        if ast.expr:
+            exprStr,exprType = self.visit(ast.expr, Access(frame,ctxt.sym,False, True))
+            self.emit.printout(exprStr)
+
+            if type(exprType) is IntType and type(retType) is FloatType:
+                self.emit.printout(self.emit.emitI2F(frame))
+
+        self.emit.printout(self.emit.emitRETURN(retType,frame))
+
     def visitFuncDecl(self, ast, o):
         #ast: FuncDecl
         #o: Any
 
         subctxt = o
-        frame = Frame(ast.name, ast.returnType)
+        frame = Frame(ast.name.name, ast.returnType)
         self.genMETHOD(ast, subctxt, frame)
-        return SubBody(None, [Symbol(ast.name, MType(list(), ast.returnType), CName(self.className))] + subctxt.sym)
+        paramTypes = list(map(lambda x: x.varType, ast.param))
+        return SubBody(None, [Symbol(ast.name.name, MType(paramTypes, ast.returnType), CName(self.className))] + subctxt.sym)
 
     def visitVarDecl(self, ast, o):
         ctxt = o
@@ -189,6 +204,7 @@ class CodeGenVisitor(BaseVisitor, Utils):
             in_ = (in_[0] + str1, in_[1].append(typ1))
         self.emit.printout(in_[0])
         self.emit.printout(self.emit.emitINVOKESTATIC(cname + "/" + ast.method.name, ctype, frame))
+        #TODO: add return??
 
     def visitDowhile(self, ast, o):
         ctxt = o
