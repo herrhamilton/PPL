@@ -134,7 +134,13 @@ class CodeGenVisitor(BaseVisitor, Utils):
         if isInit:
             self.emit.printout(self.emit.emitREADVAR("this", ClassType(self.className), 0, frame))
             self.emit.printout(self.emit.emitINVOKESPECIAL(frame))
-        list(map(lambda x: self.visit(x, SubBody(frame, glenv)), body.member))
+
+        #list(map(lambda x: self.visit(x, SubBody(frame, glenv)), body.member))
+        for x in body.member:
+            if type(x) is VarDecl:
+                glenv = self.visit(x, SubBody(frame, glenv.sym))
+            else:
+                self.visit(x, SubBody(frame, glenv.sym))
 
         self.emit.printout(self.emit.emitLABEL(frame.getEndLabel(), frame))
         if type(returnType) is VoidType:
@@ -148,20 +154,23 @@ class CodeGenVisitor(BaseVisitor, Utils):
 
         subctxt = o
         frame = Frame(ast.name, ast.returnType)
-        self.genMETHOD(ast, subctxt.sym, frame)
+        self.genMETHOD(ast, subctxt, frame)
         return SubBody(None, [Symbol(ast.name, MType(list(), ast.returnType), CName(self.className))] + subctxt.sym)
 
     def visitVarDecl(self, ast, o):
         ctxt = o
         frame = ctxt.frame
+        varName = ast.variable
+        varType = ast.varType
         if frame is None: #global
-            self.emit.printout(self.emit.emitATTRIBUTE(ast.variable, ast.varType, False, None))
-            o.sym.append(Symbol(ast.variable, ast.varType, CName(self.className)))
-            return o
+            self.emit.printout(self.emit.emitATTRIBUTE(varName, varType, False, None))
+            return SubBody(None, [Symbol(varName, varType, CName(self.className))] + ctxt.sym)
 
         else: #local var
-            raise Exception("ÄH HALLOOOOOOOO")
-            pass
+            index = frame.getNewIndex()
+            var = self.emit.emitVAR(index, varName, varType, frame.getStartLabel(), frame.getEndLabel(), frame)
+            self.emit.printout(var) # TODO: Can you move .getLabel() into Emitter?
+            return SubBody(frame,[Symbol(varName, varType, index)] + ctxt.sym)
 
     def visitCallExpr(self, ast, o):
         #ast: CallExpr
@@ -174,7 +183,6 @@ class CodeGenVisitor(BaseVisitor, Utils):
         cname = sym.value.value
     
         ctype = sym.mtype
-
         in_ = ("", list())
         for x in ast.param:
             str1, typ1 = self.visit(x, Access(frame, nenv, False, True))
@@ -186,9 +194,8 @@ class CodeGenVisitor(BaseVisitor, Utils):
         ctxt = o
         frame = ctxt.frame
         frame.enterLoop()
-
         self.emit.printout(self.emit.emitLABEL(frame.getContinueLabel(), frame))
-        for st in ast.sl:
+        for st in ast.sl: # TODO: Add updating sym
             self.visit(st, SubBody(frame, ctxt.sym))
         exp, exptyp = self.visit(ast.exp,Access(frame, ctxt.sym, False, False))
         self.emit.printout(self.emit.emitIFTRUE(frame.getContinueLabel(), frame))
@@ -203,7 +210,6 @@ class CodeGenVisitor(BaseVisitor, Utils):
     # loop:Stmt
         ctxt = o
         frame = ctxt.frame
-
         frame.enterLoop()
         exp1, exp1typ = self.visit(ast.expr1,Access(frame, ctxt.sym, False, False))
 
@@ -250,7 +256,6 @@ class CodeGenVisitor(BaseVisitor, Utils):
     def visitBinaryOp(self, ast, o):
         ctxt = o
         frame = ctxt.frame
-
         if ast.op == "=":
             return self.visitAssignment(ast, o)
         
@@ -279,7 +284,6 @@ class CodeGenVisitor(BaseVisitor, Utils):
 
         ctxt = o
         frame = ctxt.frame
-
         #this visit just for type checking
         _, l_ = self.visit(ast.left, Access(frame, o.sym, True, True))
 
@@ -310,24 +314,35 @@ class CodeGenVisitor(BaseVisitor, Utils):
         symbols = o.sym
         isFirst = o.isFirst
         isLeft = o.isLeft
+
         id_ = self.lookup(ast.name, symbols, lambda x: x.name)
+
+        type_ = id_.mtype
 
         if type(id_.value) is CName:
             name = self.className + "/" + id_.name
             if isLeft:
                 if isFirst: #just for type checking, NO emit here
-                    x = "", id_.mtype
+                    x = "", type_
                     return x # find id in symbols
                 else:
-                    return self.emit.emitPUTSTATIC(name, id_.mtype, frame), id_.mtype # find id, store
+                    return self.emit.emitPUTSTATIC(name, type_, frame), type_ # find id, store
             else:
-                return self.emit.emitGETSTATIC(name,id_.mtype,frame), id_.mtype #find id in symbols, load index
+                return self.emit.emitGETSTATIC(name, type_, frame), type_ #find id in symbols, load index
         else: #local
-            raise Exception("Should not enter this yet..")
+            name = id_.name
+            index = id_.value
+            if isLeft:
+                if isFirst: #just for type checking, NO emit here
+                    x = "", type_
+                    return x # find id in symbols
+                else:
+                    return self.emit.emit(name, type_, index, frame), type_ # find id, store # TODO: Jim has writeVAR func
+            else:
+                return self.emit.emitREADVAR(name, type_, index, frame), type_ #find id in symbols, load index
 
     def getOperands(self, lOp, rOp, o):
         frame = o.frame
-
         lStr, l_ = self.visit(lOp, Access(frame, o.sym, False, False))
         rStr, r_ = self.visit(rOp, Access(frame, o.sym, False, False))
         
