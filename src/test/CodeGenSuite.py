@@ -73,14 +73,22 @@ class CheckCodeGenSuite(unittest.TestCase):
         expect = "1.0"
         self.assertTrue(TestCodeGen.test(input,expect,509))
 
-    # def test_for_ast(self):
-    #     exp1 = BinaryOp("=",Id("i"),IntLiteral(1))
-    #     exp2 = BinaryOp("<",Id("i"),IntLiteral(5))
-    #     exp3 = BinaryOp("=",Id("i"),BinaryOp("+",Id("i"),IntLiteral(1)))
-    #     loop = Block([CallExpr(Id("putInt"),[Id("i")])])
-    #     _for = For(exp1, exp2, exp3, loop)
+    def test_for_ast(self):
+        exp1 = BinaryOp("=",Id("i"),IntLiteral(1))
+        exp2 = BinaryOp("<",Id("i"),IntLiteral(5))
+        exp3 = BinaryOp("=",Id("i"),BinaryOp("+",Id("i"),IntLiteral(1)))
+        loop = Block([])
+        _for = For(exp1, exp2, exp3, loop)
 
-    #     input = Program([VarDecl("i", IntType()),
-    # 		FuncDecl(Id("main"),[],VoidType(),Block([_for]))])
-    #     expect = "5"
-    #     self.assertTrue(TestCodeGen.test(input, expect, 508))
+        input = Program([VarDecl("i", IntType()),
+    		FuncDecl(Id("main"),[],VoidType(),Block([_for, CallExpr(Id("putInt"),[Id("i")])]))])
+        expect = "5"
+        self.assertTrue(TestCodeGen.test(input, expect, 510))
+
+    def test_dowhile_ast(self):
+        exp = BinaryOp("=",Id("i"),BinaryOp("+",Id("i"),IntLiteral(2)))
+        dowhile = Dowhile([exp], BinaryOp("<",Id("i"),IntLiteral(11)))
+        input = Program([VarDecl("i", IntType()), FuncDecl(Id("main"),[],VoidType(),
+            Block([BinaryOp("=",Id("i"),IntLiteral(0)), CallExpr(Id("putInt"),[Id("i")])]))])
+        expect = "0"
+        self.assertTrue(TestCodeGen.test(input, expect, 511))

@@ -182,6 +182,20 @@ class CodeGenVisitor(BaseVisitor, Utils):
         self.emit.printout(in_[0])
         self.emit.printout(self.emit.emitINVOKESTATIC(cname + "/" + ast.method.name, ctype, frame))
 
+    def visitDowhile(self, ast, o):
+        ctxt = o
+        frame = ctxt.frame
+        frame.enterLoop()
+
+        self.emit.printout(self.emit.emitLABEL(frame.getContinueLabel(), frame))
+        for st in ast.sl:
+            self.visit(st, SubBody(frame, ctxt.sym))
+        exp, exptyp = self.visit(ast.exp,Access(frame, ctxt.sym, False, False))
+        self.emit.printout(self.emit.emitIFTRUE(frame.getContinueLabel(), frame))
+        self.emit.printout(self.emit.emitLABEL(frame.getBreakLabel(), frame))
+
+        frame.exitLoop()
+
     def visitFor(self, ast, o):
     # expr1:Expr
     # expr2:Expr
@@ -192,17 +206,16 @@ class CodeGenVisitor(BaseVisitor, Utils):
 
         frame.enterLoop()
         exp1, exp1typ = self.visit(ast.expr1,Access(frame, ctxt.sym, False, False))
-        #self.emit.printout(exp1)
 
         self.emit.printout(self.emit.emitLABEL(frame.getContinueLabel(), frame))
         exp2, exp2typ = self.visit(ast.expr2,Access(frame, ctxt.sym, False, False))
-        self.emit.printout(self.emit.emitIFTRUE(frame.getBreakLabel(), frame))
+        self.emit.printout(self.emit.emitIFFALSE(frame.getBreakLabel(), frame))
 
         # loop
         self.visit(ast.loop, ctxt) #TODO: ctxt Correct?
-        # Jim: list(map(lambda x: self.visit(x, SubBody(frame, ctxt.sym)), ast.loop))
+        #list(map(lambda x: self.visit(x, SubBody(frame, ctxt.sym)), ast.loop)) # from Jim
         #exp3
-        exp3, exp3typ = self.visit(ast.expr3,Access(frame, ctxt.sym, False, False)) # TODO: False False good or change Access in general?
+        exp3, exp3typ = self.visit(ast.expr3,o)
         
 
         self.emit.printout(self.emit.emitGOTO(frame.getContinueLabel(),frame))
@@ -249,18 +262,14 @@ class CodeGenVisitor(BaseVisitor, Utils):
                 operandStr += self.emit.emitMULOP(ast.op, type_ ,frame)
 
             return operandStr, type_
-        if ast.op in [">", "<", ">=", "<=", "==", "!="]: #TODO: types
-            print("AAAAAAAAAAAAAAAAAAAAAAAA")
-
-            print(frame.currOpStackSize)
+        if ast.op in [">", "<", ">=", "<=", "==", "!="]: 
+            #TODO: types
             leftStr, leftType = self.visit(ast.left, Access(frame, o.sym, False, False))
-            print(frame.currOpStackSize)
             rightStr, rightType = self.visit(ast.right, Access(frame, o.sym, False, False))
-            print(frame.currOpStackSize)
 
-            self.emit.printout(leftStr + rightStr)
-            self.emit.printout(self.emit.emitREOP(ast.op, leftType, frame))
-            return operandStr, leftType
+            operandStr = leftStr + rightStr + self.emit.emitREOP(ast.op, leftType, frame)
+            self.emit.printout(operandStr)
+            return operandStr, BoolType() # TODO: with or without brackets?!
 
     def visitAssignment(self, ast, o):
         # a = b (index1 = index2)
@@ -276,7 +285,7 @@ class CodeGenVisitor(BaseVisitor, Utils):
 
         rightStr, r_ = self.visit(ast.right, Access(frame, o.sym, False, False))
         operandStr = rightStr
-        
+
         leftType = type(l_)
         rightType = type(r_)
 
@@ -291,7 +300,7 @@ class CodeGenVisitor(BaseVisitor, Utils):
             # duplicate result of assignment so it stays after storing
             # get store cell
         leftStr, leftType = self.visit(ast.left, Access(frame, o.sym, True, False))
-        operandStr += self.emit.emitDUP(frame) + leftStr
+        operandStr += leftStr # TODO: CHECK: deleted "self.emit.emitDUP(frame) + " before leftStr so Code works.. Does it get dup'd elsewhere?
 
         self.emit.printout(operandStr)
         return operandStr, leftType
@@ -318,8 +327,9 @@ class CodeGenVisitor(BaseVisitor, Utils):
 
     def getOperands(self, lOp, rOp, o):
         frame = o.frame
-        lStr, l_ = self.visit(lOp, Access(frame, o, False, False))
-        rStr, r_ = self.visit(rOp, Access(frame, o, False, False))
+
+        lStr, l_ = self.visit(lOp, Access(frame, o.sym, False, False))
+        rStr, r_ = self.visit(rOp, Access(frame, o.sym, False, False))
         
         lType = type(l_)
         rType = type(r_)
