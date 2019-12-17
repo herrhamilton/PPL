@@ -214,10 +214,33 @@ class CodeGenVisitor(BaseVisitor, Utils):
         for st in ast.sl: # TODO: Add updating sym
             self.visit(st, SubBody(frame, ctxt.sym))
         exp, exptyp = self.visit(ast.exp,Access(frame, ctxt.sym, False, False))
+        self.emit.printout(exp)
         self.emit.printout(self.emit.emitIFTRUE(frame.getContinueLabel(), frame))
         self.emit.printout(self.emit.emitLABEL(frame.getBreakLabel(), frame))
 
         frame.exitLoop()
+
+    def visitIf(self, ast , o):
+        ctxt = o
+        frame = ctxt.frame
+        
+        elseLabel = frame.getNewLabel() 
+        endLabel = frame.getNewLabel()
+
+        expStr, expType = self.visit(ast.expr, Access(frame, o.sym, False, False))
+        self.emit.printout(expStr)
+        self.emit.printout(self.emit.emitIFFALSE(elseLabel, frame))
+
+        self.visit(ast.thenStmt, o)
+        self.emit.printout(self.emit.emitGOTO(endLabel,frame))
+
+        self.emit.printout(self.emit.emitLABEL(elseLabel, frame))
+        if ast.elseStmt:
+            self.visit(ast.elseStmt, o) # TODO: printout somewhere??
+        
+        self.emit.printout(self.emit.emitLABEL(endLabel, frame))
+
+
 
     def visitFor(self, ast, o):
     # expr1:Expr
@@ -231,6 +254,7 @@ class CodeGenVisitor(BaseVisitor, Utils):
 
         self.emit.printout(self.emit.emitLABEL(frame.getContinueLabel(), frame))
         exp2, exp2typ = self.visit(ast.expr2,Access(frame, ctxt.sym, False, False))
+        self.emit.printout(exp2)
         self.emit.printout(self.emit.emitIFFALSE(frame.getBreakLabel(), frame))
 
         # loop
@@ -277,6 +301,28 @@ class CodeGenVisitor(BaseVisitor, Utils):
         frame = ctxt.frame
         return self.emit.emitPUSHFCONST(str(ast.value), frame), FloatType()
 
+    def visitBooleanLiteral(self, ast, o):
+        ctxt = o
+        frame = ctxt.frame
+        return self.emit.emitPUSHICONST(str(ast.value).lower(), frame), BoolType()
+
+    def visitStringLiteral(self, ast, o):
+        ctxt = o
+        frame = ctxt.frame
+        return self.emit.emitPUSHCONST('"' + ast.value + '"', StringType(), frame), BoolType()
+
+    def visitUnaryOp(self, ast, o):
+        # TODO: [] needed?
+        ctxt = o
+        frame = ctxt.frame
+        operator = ast.op
+        expStr, expType = self.visit(ast.body,o)
+
+        if operator == '-':
+            return expStr + self.emit.emitNEGOP(expType,frame), expType
+        if operator == '!':
+            return expStr + self.emit.emitNOT(BoolType(),frame), expType
+
     def visitBinaryOp(self, ast, o):
         ctxt = o
         frame = ctxt.frame
@@ -292,12 +338,14 @@ class CodeGenVisitor(BaseVisitor, Utils):
 
             return operandStr, type_
         if ast.op in [">", "<", ">=", "<=", "==", "!="]: 
-            #TODO: types
             leftStr, leftType = self.visit(ast.left, Access(frame, o.sym, False, False))
             rightStr, rightType = self.visit(ast.right, Access(frame, o.sym, False, False))
 
-            operandStr = leftStr + rightStr + self.emit.emitREOP(ast.op, leftType, frame)
-            self.emit.printout(operandStr)
+            operandStr = leftStr + rightStr
+            if type(leftType) is FloatType and type(rightType) is IntType:
+                operandStr += self.emit.emitI2F(frame)
+
+            operandStr += self.emit.emitREOP(ast.op, leftType, frame)
             return operandStr, BoolType() # TODO: with or without brackets?!
 
     def visitAssignment(self, ast, o):
@@ -381,5 +429,3 @@ class CodeGenVisitor(BaseVisitor, Utils):
             return lStr + self.emit.emitI2F(frame) + rStr, FloatType
         else:
             raise Exception("Should never come here")
-
-        

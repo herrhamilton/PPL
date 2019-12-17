@@ -4,11 +4,11 @@ from AST import *
 
 
 class CheckCodeGenSuite(unittest.TestCase):
-    def test_int(self): # TODO: Fix ASTGeneration
-        """Simple program: int main() {} """
-        input = """void main() {putInt(100);}"""
-        expect = "100"
-        self.assertTrue(TestCodeGen.test(input,expect,500))
+    # def test_int(self): # TODO: Fix ASTGeneration
+    #     """Simple program: int main() {} """
+    #     input = """void main() {putInt(100);}"""
+    #     expect = "100"
+    #     self.assertTrue(TestCodeGen.test(input,expect,500))
 
     def test_int_ast(self):
     	input = Program([
@@ -119,10 +119,97 @@ class CheckCodeGenSuite(unittest.TestCase):
         expect = "0"
         self.assertTrue(TestCodeGen.test(input, expect, 515))
 
-    # def test_continue_ast(self): #TODO: Implement after if logic
-    #     expr = [Break()]
-    #     dowhile = Dowhile(expr, BinaryOp("<",Id("i"),IntLiteral(11)))
-    #     input = Program([VarDecl("i", IntType()), FuncDecl(Id("main"),[],VoidType(),
-    #         Block([BinaryOp("=",Id("i"),IntLiteral(0)), dowhile, CallExpr(Id("putInt"),[Id("i")])]))])
-    #     expect = "0"
-    #     self.assertTrue(TestCodeGen.test(input, expect, 515))
+    def test_unaryop_ast(self):
+    	input = Program([
+    		FuncDecl(Id("main"),[],VoidType(),Block([
+    			CallExpr(Id("putInt"),[IntLiteral(-5)]), Return()]))])
+    	expect = "-5"
+    	self.assertTrue(TestCodeGen.test(input,expect,516))
+
+    def test_unaryop_assignment_vardecl_ast(self):
+    	input = Program([VarDecl("x", FloatType()),
+    		FuncDecl(Id("main"),[],VoidType(),Block([BinaryOp("=",Id("x"),FloatLiteral(1.2)),
+            BinaryOp("=",Id("x"),UnaryOp("-", Id("x"))),
+    			CallExpr(Id("putFloat"),[Id("x")])]))])
+    	expect = "-1.2"
+    	self.assertTrue(TestCodeGen.test(input,expect,517))
+
+    def test_if_ast(self):
+    	input = Program([
+    		FuncDecl(Id("main"),[],VoidType(),Block([
+                If(BooleanLiteral(True),
+                CallExpr(Id("putInt"),[IntLiteral(5)]))
+    			]))])
+    	expect = "5"
+    	self.assertTrue(TestCodeGen.test(input,expect,518))
+
+    def test_if_else_ast(self):
+    	input = Program([
+    		FuncDecl(Id("main"),[],VoidType(),Block([
+                If(BooleanLiteral(False),
+                CallExpr(Id("putInt"),[IntLiteral(5)]),
+                CallExpr(Id("putInt"),[IntLiteral(10)]))
+    			]))])
+    	expect = "10"
+    	self.assertTrue(TestCodeGen.test(input,expect,519))
+
+    def test_int_boolean_ast(self):
+    	input = Program([
+    		FuncDecl(Id("main"),[],VoidType(),Block([
+                If(BinaryOp("==", IntLiteral(3), IntLiteral(3)),
+                CallExpr(Id("putInt"),[IntLiteral(5)]),
+                CallExpr(Id("putInt"),[IntLiteral(10)]))
+    			]))])
+    	expect = "5"
+    	self.assertTrue(TestCodeGen.test(input,expect,520))
+
+    def test_float_boolean_ast(self):
+    	input = Program([
+    		FuncDecl(Id("main"),[],VoidType(),Block([
+                If(BinaryOp("<=", FloatLiteral(3.0), FloatLiteral(7.65)),
+                CallExpr(Id("putInt"),[IntLiteral(5)]),
+                CallExpr(Id("putInt"),[IntLiteral(10)]))
+    			]))])
+    	expect = "5"
+    	self.assertTrue(TestCodeGen.test(input,expect,521))
+
+    def test_floateq_boolean_ast(self):
+    	input = Program([
+    		FuncDecl(Id("main"),[],VoidType(),Block([
+                If(BinaryOp("<=", FloatLiteral(3.0), FloatLiteral(3.0)),
+                CallExpr(Id("putInt"),[IntLiteral(5)]),
+                CallExpr(Id("putInt"),[IntLiteral(10)]))
+    			]))])
+    	expect = "5"
+    	self.assertTrue(TestCodeGen.test(input,expect,522))
+
+    def test_floatgr_boolean_ast(self):
+    	input = Program([
+    		FuncDecl(Id("main"),[],VoidType(),Block([
+                If(BinaryOp("<=", FloatLiteral(7.65), FloatLiteral(3.0)),
+                CallExpr(Id("putInt"),[IntLiteral(5)]),
+                CallExpr(Id("putInt"),[IntLiteral(10)]))
+    			]))])
+    	expect = "10"
+    	self.assertTrue(TestCodeGen.test(input,expect,523))
+
+    def test_i2f_boolean_ast(self):
+    	input = Program([
+    		FuncDecl(Id("main"),[],VoidType(),Block([
+                If(BinaryOp("<=", FloatLiteral(7.0), IntLiteral(7)),
+                CallExpr(Id("putInt"),[IntLiteral(5)]),
+                CallExpr(Id("putInt"),[IntLiteral(10)]))
+    			]))])
+    	expect = "5"
+    	self.assertTrue(TestCodeGen.test(input,expect,524))
+
+    def test_continue_ast(self): #TODO: Implement after if logic
+        loop = [BinaryOp("=",Id("i"), BinaryOp("+",Id("i"), IntLiteral(2))), If(BinaryOp("<",Id("i"), IntLiteral(7)), Continue()), CallExpr(Id("putInt"),[Id("i")])]
+        dowhile = Dowhile(loop, BinaryOp("<",Id("i"),IntLiteral(11)))
+        input = Program([VarDecl("i", IntType()), FuncDecl(Id("main"),[],VoidType(),
+            Block([BinaryOp("=",Id("i"),IntLiteral(0)), dowhile]))])
+        expect = "81012"
+        self.assertTrue(TestCodeGen.test(input, expect, 525))
+
+    #TODO: Test other types
+    # !true
