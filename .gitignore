@@ -1,0 +1,6 @@
+target
+testcases
+solutions
+__pycache__
+.antlr
+*.class
