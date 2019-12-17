@@ -204,7 +204,7 @@ class CodeGenVisitor(BaseVisitor, Utils):
             in_ = (in_[0] + str1, in_[1].append(typ1))
         self.emit.printout(in_[0])
         self.emit.printout(self.emit.emitINVOKESTATIC(cname + "/" + ast.method.name, ctype, frame))
-        #TODO: add return??
+        return in_[0], ctype
 
     def visitDowhile(self, ast, o):
         ctxt = o

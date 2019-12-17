@@ -82,7 +82,11 @@ class Emitter():
         #frame: Frame
         
         if type(typ) is IntType:
-            return self.emitPUSHICONST(in_, frame) # TODO: float missing??
+            return self.emitPUSHICONST(in_, frame)
+        elif type(typ) is FloatType:
+            return self.emitPUSHFCONST(in_, frame)
+        elif type(typ) is BoolType:
+            return self.emitPUSHICONST(in_, frame)
         elif type(typ) is StringType:
             frame.push()
             return self.jvm.emitLDC(in_)
@@ -310,18 +314,18 @@ class Emitter():
             return self.jvm.emitFNEG()
 
     def emitNOT(self, in_, frame):
-        #in_: Type
+#in_: Type
         #frame: Frame
 
         label1 = frame.getNewLabel()
         label2 = frame.getNewLabel()
         result = list()
-        result.append(emitIFTRUE(label1, frame))
-        result.append(emitPUSHCONST("true", in_, frame))
-        result.append(emitGOTO(label2, frame))
-        result.append(emitLABEL(label1, frame))
-        result.append(emitPUSHCONST("false", in_, frame))
-        result.append(emitLABEL(label2, frame))
+        result.append(self.emitIFTRUE(label1, frame))
+        result.append(self.emitPUSHCONST("true", in_, frame))
+        result.append(self.emitGOTO(label2, frame))
+        result.append(self.emitLABEL(label1, frame))
+        result.append(self.emitPUSHCONST("false", in_, frame))
+        result.append(self.emitLABEL(label2, frame))
         return ''.join(result)
 
     '''
