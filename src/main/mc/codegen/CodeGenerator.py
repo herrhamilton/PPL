@@ -253,6 +253,14 @@ class CodeGenVisitor(BaseVisitor, Utils):
     # goto label1
     # label 2
 
+    def visitBreak(self,ast, o):
+        frame = o.frame
+        self.emit.printout(self.emit.emitGOTO(frame.getBreakLabel(),frame))
+
+    def visitContinue(self, ast, o):
+        frame = o.frame
+        self.emit.printout(self.emit.emitGOTO(frame.getContinueLabel(),frame))
+
     def visitIntLiteral(self, ast, o):
         #ast: IntLiteral
         #o: Any

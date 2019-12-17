@@ -4,11 +4,11 @@ from AST import *
 
 
 class CheckCodeGenSuite(unittest.TestCase):
-    # def test_int(self): # TODO: Fix ASTGeneration
-    #     """Simple program: int main() {} """
-    #     input = """void main() {putInt(100);}"""
-    #     expect = "100"
-    #     self.assertTrue(TestCodeGen.test(input,expect,500))
+    def test_int(self): # TODO: Fix ASTGeneration
+        """Simple program: int main() {} """
+        input = """void main() {putInt(100);}"""
+        expect = "100"
+        self.assertTrue(TestCodeGen.test(input,expect,500))
 
     def test_int_ast(self):
     	input = Program([
@@ -110,3 +110,19 @@ class CheckCodeGenSuite(unittest.TestCase):
                         FuncDecl(Id("main"),[],VoidType(),Block([CallExpr(Id("foo"),[])]))])
         expect = "6.66"
         self.assertTrue(TestCodeGen.test(input,expect,514))
+
+    def test_break_ast(self):
+        expr = [Break()]
+        dowhile = Dowhile(expr, BinaryOp("<",Id("i"),IntLiteral(11)))
+        input = Program([VarDecl("i", IntType()), FuncDecl(Id("main"),[],VoidType(),
+            Block([BinaryOp("=",Id("i"),IntLiteral(0)), dowhile, CallExpr(Id("putInt"),[Id("i")])]))])
+        expect = "0"
+        self.assertTrue(TestCodeGen.test(input, expect, 515))
+
+    # def test_continue_ast(self): #TODO: Implement after if logic
+    #     expr = [Break()]
+    #     dowhile = Dowhile(expr, BinaryOp("<",Id("i"),IntLiteral(11)))
+    #     input = Program([VarDecl("i", IntType()), FuncDecl(Id("main"),[],VoidType(),
+    #         Block([BinaryOp("=",Id("i"),IntLiteral(0)), dowhile, CallExpr(Id("putInt"),[Id("i")])]))])
+    #     expect = "0"
+    #     self.assertTrue(TestCodeGen.test(input, expect, 515))
